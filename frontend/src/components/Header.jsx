@@ -19,7 +19,7 @@ export default function Header({ user, currentPage }) {
         <div>
           <h2>{pageTitles[currentPage] || 'Dashboard'}</h2>
           <div className="header-breadcrumb">
-            AiDetect / {pageTitles[currentPage] || 'Dashboard'}
+            Fradupix / {pageTitles[currentPage] || 'Dashboard'}
           </div>
         </div>
       </div>

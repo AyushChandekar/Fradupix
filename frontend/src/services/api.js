@@ -9,7 +9,7 @@ const api = axios.create({
 
 // Attach JWT token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('aidetect_token');
+  const token = localStorage.getItem('fradupix_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -21,8 +21,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('aidetect_token');
-      localStorage.removeItem('aidetect_user');
+      localStorage.removeItem('fradupix_token');
+      localStorage.removeItem('fradupix_user');
       window.location.href = '/login';
     }
     return Promise.reject(error);

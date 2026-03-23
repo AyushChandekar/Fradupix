@@ -26,8 +26,8 @@ export default function Login() {
       }
 
       const { access_token, user } = res.data
-      localStorage.setItem('aidetect_token', access_token)
-      localStorage.setItem('aidetect_user', JSON.stringify(user))
+      localStorage.setItem('fradupix_token', access_token)
+      localStorage.setItem('fradupix_user', JSON.stringify(user))
       navigate('/')
     } catch (err) {
       setError(err.response?.data?.detail || 'Authentication failed')
@@ -42,10 +42,10 @@ export default function Login() {
     setLoading(true)
     try {
       // Use the real backend credentials
-      const res = await authAPI.login('admin@aidetect.com', 'admin123')
+      const res = await authAPI.login('admin@fradupix.com', 'admin123')
       const { access_token, user } = res.data
-      localStorage.setItem('aidetect_token', access_token)
-      localStorage.setItem('aidetect_user', JSON.stringify(user))
+      localStorage.setItem('fradupix_token', access_token)
+      localStorage.setItem('fradupix_user', JSON.stringify(user))
       navigate('/')
     } catch (err) {
       setError(err.response?.data?.detail || 'Demo login failed. Make sure backend is running.')
@@ -59,7 +59,7 @@ export default function Login() {
       <div className="login-container animate-slide-up">
         <div className="login-brand">
           <div className="login-brand-icon">🛡️</div>
-          <h1>AiDetect</h1>
+          <h1>fradupix</h1>
           <p>AI-Powered Invoice Fraud Detection Engine</p>
         </div>
 

@@ -1,5 +1,5 @@
 """
-AiDetect - AI-Powered Invoice Fraud & Duplicate Detection Engine
+fradupix - AI-Powered Invoice Fraud & Duplicate Detection Engine
 FastAPI Application Entry Point
 """
 import logging

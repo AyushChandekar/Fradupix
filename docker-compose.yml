@@ -5,15 +5,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-aidetect}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aidetect_secure_2024}
-      POSTGRES_DB: ${POSTGRES_DB:-aidetect}
+      POSTGRES_USER: ${POSTGRES_USER:-fradupix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fradupix_secure_2024}
+      POSTGRES_DB: ${POSTGRES_DB:-fradupix}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aidetect"]
+      test: ["CMD-SHELL", "pg_isready -U fradupix"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,7 +52,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://aidetect:aidetect_secure_2024@db:5432/aidetect
+      - DATABASE_URL=postgresql://fradupix:fradupix_secure_2024@db:5432/fradupix
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
@@ -79,7 +79,7 @@ services:
       dockerfile: Dockerfile
     command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
     environment:
-      - DATABASE_URL=postgresql://aidetect:aidetect_secure_2024@db:5432/aidetect
+      - DATABASE_URL=postgresql://fradupix:fradupix_secure_2024@db:5432/fradupix
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
@@ -102,7 +102,7 @@ services:
       dockerfile: Dockerfile
     command: celery -A app.tasks.celery_app beat --loglevel=info
     environment:
-      - DATABASE_URL=postgresql://aidetect:aidetect_secure_2024@db:5432/aidetect
+      - DATABASE_URL=postgresql://fradupix:fradupix_secure_2024@db:5432/fradupix
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1

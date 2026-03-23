@@ -6,11 +6,11 @@ from functools import lru_cache
 class Settings(BaseSettings):
     # App
     APP_ENV: str = "development"
-    APP_NAME: str = "AiDetect - Invoice Fraud Detection"
+    APP_NAME: str = "Fradupix - Invoice Fraud Detection"
     APP_VERSION: str = "1.0.0"
 
     # Database
-    DATABASE_URL: str = "postgresql://aidetect:aidetect_secure_2024@localhost:5432/aidetect"
+    DATABASE_URL: str = "postgresql://fradupix:fradupix_secure_2024@localhost:5432/fradupix"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

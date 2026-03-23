@@ -11,13 +11,13 @@ import Login from './pages/Login'
 
 function getUser() {
   try {
-    const u = localStorage.getItem('aidetect_user')
+    const u = localStorage.getItem('fradupix_user')
     return u ? JSON.parse(u) : null
   } catch { return null }
 }
 
 function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('aidetect_token')
+  const token = localStorage.getItem('fradupix_token')
   if (!token) return <Navigate to="/login" replace />
   return children
 }

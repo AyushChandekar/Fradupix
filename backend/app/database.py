@@ -30,7 +30,7 @@ def _create_engine():
             logger.warning(f"⚠️ PostgreSQL unavailable ({e}), falling back to SQLite")
 
     # Fallback to SQLite
-    sqlite_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "aidetect.db")
+    sqlite_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fradupix.db")
     sqlite_url = f"sqlite:///{sqlite_path}"
     eng = create_engine(
         sqlite_url,

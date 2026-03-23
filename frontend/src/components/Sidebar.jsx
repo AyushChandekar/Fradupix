@@ -20,8 +20,8 @@ export default function Sidebar({ currentPage }) {
   const navigate = useNavigate()
 
   const handleLogout = () => {
-    localStorage.removeItem('aidetect_token')
-    localStorage.removeItem('aidetect_user')
+    localStorage.removeItem('fradupix_token')
+    localStorage.removeItem('fradupix_user')
     navigate('/login')
   }
 
@@ -30,7 +30,7 @@ export default function Sidebar({ currentPage }) {
       <div className="sidebar-brand">
         <div className="sidebar-brand-icon">🛡️</div>
         <div className="sidebar-brand-text">
-          <h1>AiDetect</h1>
+          <h1>Fradupix</h1>
           <span>Fraud Detection</span>
         </div>
       </div>
