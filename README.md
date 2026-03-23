@@ -1,4 +1,4 @@
-# Fradupix — AI-Powered Invoice Fraud & Duplicate Detection Engine
+# Fradupix - AI-Powered Invoice Fraud & Duplicate Detection Engine
 
 > An automated "firewall" system for finance teams that detects duplicate, forged, or manipulated invoices using OCR, machine learning, and forensic analysis.
 
