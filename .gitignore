@@ -132,6 +132,9 @@ wheels/
 htmlcov/
 .mypy_cache/
 
+# uv
+.python-version
+
 # OS metadata
 .DS_Store
 Thumbs.db
