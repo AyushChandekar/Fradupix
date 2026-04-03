@@ -138,3 +138,6 @@ htmlcov/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# ignoring the development plan
+InvoiceFirewall_SRS_Development_Plan.pdf
