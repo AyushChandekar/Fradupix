@@ -6,51 +6,54 @@ python-multipart>=0.0.9
 # Database
 sqlalchemy>=2.0.20
 alembic>=1.13.0
-# psycopg2-binary is only needed for PostgreSQL (Docker)
-# For local dev, SQLite is used automatically
 
-# Authentication
+# Authentication (SRS Section 11.1)
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 bcrypt>=4.1.0
 
-# Task Queue (optional for local dev)
+# Task Queue (SRS Section 2.4)
 celery[redis]>=5.3.0
 redis>=5.0.0
 
-# OCR
+# OCR (SRS FR-200)
 pytesseract>=0.3.10
 pdf2image>=1.17.0
 Pillow>=10.0.0
+easyocr>=1.7.0
 
-# ML & Data Science
+# ML & Data Science (SRS FR-600)
 scikit-learn>=1.4.0
 numpy>=1.26.0
 pandas>=2.1.0
 
-# Image Processing & Forgery Detection
+# Image Processing & Forgery Detection (SRS FR-400)
 opencv-python-headless>=4.9.0
 imagehash>=4.3.0
 
-# Fuzzy Matching
+# Fuzzy Matching (SRS FR-500)
 jellyfish>=1.0.0
 rapidfuzz>=3.6.0
 
-# Storage (MinIO S3)
+# NLP / Semantic Similarity (SRS FR-502)
+# TF-IDF via scikit-learn (already included above)
+
+# Storage (MinIO S3) (SRS Section 2.4)
 minio>=7.2.0
 
-# Encryption
+# Encryption (SRS Section 11.2)
 cryptography>=42.0.0
 
 # Utilities
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
+requests>=2.31.0
 
 # WebSocket
 websockets>=12.0
 
-# Testing
+# Testing (SRS Section 10)
 pytest>=7.4.0,<8.0.0
 pytest-asyncio>=0.23.0
 httpx>=0.27.0

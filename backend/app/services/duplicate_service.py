@@ -3,11 +3,14 @@ Duplicate Detection Service
 - Exact duplicates: file hash + perceptual hash
 - Near duplicates: fuzzy string matching (Damerau-Levenshtein)
 - Semantic similarity: vector fingerprint comparison via FAISS
+- FR-502: TF-IDF vectorization with cosine similarity for semantic line-item comparison
+- FR-503: Same-vendor identical-amount time-window duplicate detection
 """
 import io
 import hashlib
 import logging
 import pickle
+from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 
 import numpy as np
@@ -15,6 +18,8 @@ from PIL import Image
 import imagehash
 from rapidfuzz import fuzz, process
 import jellyfish
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 logger = logging.getLogger(__name__)
 
@@ -288,6 +293,185 @@ class DuplicateDetector:
 
         return results
 
+    # ──────────────────────────────────────────────
+    # 4. FR-502 – TF-IDF Semantic Line-Item Similarity
+    # ──────────────────────────────────────────────
+
+    def semantic_similarity(self, text1: str, text2: str) -> float:
+        """
+        Compute semantic similarity between two text strings using
+        TF-IDF vectorization + cosine similarity.
+
+        Returns a similarity score between 0.0 and 1.0.
+        """
+        if not text1 or not text2:
+            return 0.0
+
+        try:
+            vectorizer = TfidfVectorizer()
+            tfidf_matrix = vectorizer.fit_transform([text1, text2])
+            sim_score = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+            return float(np.clip(sim_score, 0.0, 1.0))
+        except ValueError:
+            # Happens when both texts are empty or contain only stop-words
+            return 0.0
+
+    def check_semantic_duplicates(
+        self,
+        invoice_data: Dict[str, Any],
+        known_invoices: List[Dict[str, Any]],
+        threshold: float = 0.85,
+    ) -> Dict[str, Any]:
+        """
+        FR-502: Compare line-item descriptions between an incoming invoice and
+        known invoices using TF-IDF + cosine similarity.
+
+        Flags matches whose similarity score exceeds *threshold* (default 0.85).
+
+        Returns:
+            {
+                "semantic_score": <best match score 0-100>,
+                "is_semantic_duplicate": bool,
+                "matches": [ { invoice_id, similarity, matched_items }, ... ]
+            }
+        """
+        incoming_items: List[str] = [
+            str(item) for item in invoice_data.get("line_items", []) if item
+        ]
+        # Fall back to raw_text if no structured line items
+        incoming_text = " ".join(incoming_items) if incoming_items else invoice_data.get("raw_text", "")
+
+        if not incoming_text:
+            return {"semantic_score": 0, "is_semantic_duplicate": False, "matches": []}
+
+        matches = []
+        for known in known_invoices:
+            known_items: List[str] = [
+                str(item) for item in known.get("line_items", []) if item
+            ]
+            known_text = " ".join(known_items) if known_items else known.get("raw_text", "")
+            if not known_text:
+                continue
+
+            score = self.semantic_similarity(incoming_text, known_text)
+
+            if score >= threshold:
+                matched_pairs = []
+                # Pairwise item-level comparison when structured line items exist
+                if incoming_items and known_items:
+                    for inc_item in incoming_items:
+                        for kn_item in known_items:
+                            pair_score = self.semantic_similarity(inc_item, kn_item)
+                            if pair_score >= threshold:
+                                matched_pairs.append({
+                                    "incoming": inc_item,
+                                    "known": kn_item,
+                                    "similarity": round(pair_score, 4),
+                                })
+
+                matches.append({
+                    "invoice_id": known.get("id"),
+                    "similarity": round(score, 4),
+                    "matched_items": matched_pairs,
+                })
+
+        matches.sort(key=lambda m: m["similarity"], reverse=True)
+        best_score = matches[0]["similarity"] * 100 if matches else 0
+
+        return {
+            "semantic_score": round(best_score, 2),
+            "is_semantic_duplicate": best_score >= threshold * 100,
+            "matches": matches[:10],
+        }
+
+    # ──────────────────────────────────────────────────────────
+    # 5. FR-503 – Same-Vendor / Same-Amount Time-Window Check
+    # ──────────────────────────────────────────────────────────
+
+    def check_time_window_duplicates(
+        self,
+        vendor_name: str,
+        amount: float,
+        invoice_date: Any,
+        known_invoices: List[Dict[str, Any]],
+        window_days: int = 90,
+    ) -> Dict[str, Any]:
+        """
+        FR-503: Detect invoices with identical amounts from the same vendor
+        within a configurable time window (default 90 days).
+
+        Parameters:
+            vendor_name   – vendor / supplier name on the incoming invoice
+            amount        – total amount on the incoming invoice
+            invoice_date  – date object (datetime.date or datetime.datetime)
+            known_invoices – list of previously processed invoices
+            window_days   – look-back / look-ahead window in days
+
+        Returns:
+            {
+                "time_window_score": 0-100,
+                "is_time_window_duplicate": bool,
+                "matches": [ { invoice_id, vendor, amount, date, day_diff }, ... ]
+            }
+        """
+        if not vendor_name or amount is None or invoice_date is None:
+            return {"time_window_score": 0, "is_time_window_duplicate": False, "matches": []}
+
+        # Normalise to datetime for arithmetic
+        if isinstance(invoice_date, str):
+            try:
+                invoice_date = datetime.fromisoformat(invoice_date)
+            except (ValueError, TypeError):
+                return {"time_window_score": 0, "is_time_window_duplicate": False, "matches": []}
+
+        matches = []
+        for known in known_invoices:
+            known_amount = known.get("total_amount")
+            known_vendor = known.get("vendor_name", "")
+            known_date = known.get("invoice_date")
+
+            if known_amount is None or known_date is None or not known_vendor:
+                continue
+
+            if isinstance(known_date, str):
+                try:
+                    known_date = datetime.fromisoformat(known_date)
+                except (ValueError, TypeError):
+                    continue
+
+            # Vendor fuzzy match (token_sort_ratio ≥ 85 counts as same vendor)
+            vendor_sim = fuzz.token_sort_ratio(vendor_name, known_vendor)
+            if vendor_sim < 85:
+                continue
+
+            # Exact amount match
+            if float(known_amount) != float(amount):
+                continue
+
+            # Time-window check
+            try:
+                day_diff = abs((invoice_date - known_date).days)
+            except (TypeError, AttributeError):
+                continue
+
+            if day_diff <= window_days:
+                matches.append({
+                    "invoice_id": known.get("id"),
+                    "vendor": known_vendor,
+                    "amount": float(known_amount),
+                    "date": str(known_date),
+                    "day_diff": day_diff,
+                })
+
+        matches.sort(key=lambda m: m["day_diff"])
+        best_score = 100 if matches else 0
+
+        return {
+            "time_window_score": best_score,
+            "is_time_window_duplicate": len(matches) > 0,
+            "matches": matches[:10],
+        }
+
     # ──────────────────────────────
     # Full Detection Pipeline
     # ──────────────────────────────
@@ -299,37 +483,57 @@ class DuplicateDetector:
         invoice_data: Dict[str, Any],
         known_hashes: Dict[str, str],
         known_invoices: List[Dict[str, Any]],
+        time_window_days: int = 90,
     ) -> Dict[str, Any]:
         """
         Run full duplicate detection pipeline:
-        1. Exact hash matching
+        1. Exact hash matching          (40 % weight when matched → 100)
         2. Perceptual hash comparison
-        3. Fuzzy string matching
+        3. Fuzzy string matching         (30 % weight)
         4. Vector fingerprint similarity
+        5. FR-502: TF-IDF semantic similarity (20 % weight)
+        6. FR-503: Time-window vendor/amount  (10 % weight)
+
+        Combined duplicate_score is the weighted sum of the four signal
+        categories:
+            exact_hash  × 0.40
+          + fuzzy       × 0.30
+          + semantic    × 0.20
+          + time_window × 0.10
         """
-        # File hash
+        # ---- existing checks ----
         file_hash = self.compute_file_hash(file_bytes)
         perceptual_hash = self.compute_perceptual_hash(image)
         fingerprint = self.generate_fingerprint(image)
 
-        # Check exact duplicates
         exact_result = self.check_exact_duplicate(file_hash, perceptual_hash, known_hashes)
-
-        # Fuzzy matching
         fuzzy_result = self.fuzzy_match_invoices(invoice_data, known_invoices)
-
-        # Vector similarity
         vector_matches = self.search_similar(fingerprint)
 
-        # Combined duplicate score
-        scores = [
-            exact_result["score"],
-            fuzzy_result["duplicate_score"],
-        ]
-        if vector_matches:
-            scores.append(max(m["similarity"] for m in vector_matches))
+        # ---- FR-502: semantic line-item similarity ----
+        semantic_result = self.check_semantic_duplicates(invoice_data, known_invoices)
 
-        duplicate_score = max(scores) if scores else 0
+        # ---- FR-503: time-window vendor/amount check ----
+        time_window_result = self.check_time_window_duplicates(
+            vendor_name=invoice_data.get("vendor_name", ""),
+            amount=invoice_data.get("total_amount", 0),
+            invoice_date=invoice_data.get("invoice_date"),
+            known_invoices=known_invoices,
+            window_days=time_window_days,
+        )
+
+        # ---- weighted composite score ----
+        exact_score = exact_result["score"]                        # 0 or 100
+        fuzzy_score = fuzzy_result["duplicate_score"]              # 0-100
+        semantic_score = semantic_result["semantic_score"]          # 0-100
+        time_window_score = time_window_result["time_window_score"]  # 0 or 100
+
+        duplicate_score = (
+            exact_score    * 0.40
+            + fuzzy_score  * 0.30
+            + semantic_score * 0.20
+            + time_window_score * 0.10
+        )
 
         return {
             "file_hash": file_hash,
@@ -340,19 +544,50 @@ class DuplicateDetector:
             "exact_match": exact_result,
             "fuzzy_matches": fuzzy_result,
             "vector_matches": vector_matches,
-            "summary": self._generate_summary(duplicate_score, exact_result, fuzzy_result),
+            "semantic_matches": semantic_result,
+            "time_window_matches": time_window_result,
+            "summary": self._generate_summary(
+                duplicate_score, exact_result, fuzzy_result,
+                semantic_result, time_window_result,
+            ),
         }
 
     def _generate_summary(
-        self, score: float, exact: Dict, fuzzy: Dict
+        self,
+        score: float,
+        exact: Dict,
+        fuzzy: Dict,
+        semantic: Optional[Dict] = None,
+        time_window: Optional[Dict] = None,
     ) -> str:
         """Generate human-readable duplicate analysis summary."""
         if exact["is_exact_duplicate"]:
-            return f"🚨 EXACT DUPLICATE detected (matches invoice {exact['duplicate_of']})"
-        elif score > 80:
-            return f"⚠️ Near-duplicate detected (similarity: {score:.1f}%)"
+            return f"EXACT DUPLICATE detected (matches invoice {exact['duplicate_of']})"
+
+        flags: List[str] = []
+        if semantic and semantic.get("is_semantic_duplicate"):
+            flags.append(
+                f"semantic line-item match ({semantic['semantic_score']:.1f}%)"
+            )
+        if time_window and time_window.get("is_time_window_duplicate"):
+            tw_match = time_window["matches"][0]
+            flags.append(
+                f"same vendor+amount within {tw_match['day_diff']} days "
+                f"(invoice {tw_match['invoice_id']})"
+            )
+
+        if score > 80:
+            detail = f"Near-duplicate detected (similarity: {score:.1f}%)"
+            if flags:
+                detail += " | " + "; ".join(flags)
+            return detail
         elif score > 60:
-            return f"Potential duplicate flag (similarity: {score:.1f}%) - review recommended"
+            detail = f"Potential duplicate flag (similarity: {score:.1f}%) - review recommended"
+            if flags:
+                detail += " | " + "; ".join(flags)
+            return detail
+        elif flags:
+            return "Flagged: " + "; ".join(flags)
         else:
             return "No significant duplicates found"
 

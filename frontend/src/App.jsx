@@ -1,4 +1,3 @@
-import { useState, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
@@ -7,6 +6,9 @@ import Invoices from './pages/Invoices'
 import Upload from './pages/Upload'
 import InvoiceDetail from './pages/InvoiceDetail'
 import Alerts from './pages/Alerts'
+import Analytics from './pages/Analytics'
+import AuditLog from './pages/AuditLog'
+import Settings from './pages/Settings'
 import Login from './pages/Login'
 
 function getUser() {
@@ -22,11 +24,11 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-function AppLayout({ children, currentPage, onNavigate }) {
+function AppLayout({ children, currentPage }) {
   const user = getUser()
   return (
     <div className="app-layout">
-      <Sidebar currentPage={currentPage} onNavigate={onNavigate} />
+      <Sidebar currentPage={currentPage} />
       <div className="main-content">
         <Header user={user} currentPage={currentPage} />
         <div className="page-content">
@@ -37,46 +39,29 @@ function AppLayout({ children, currentPage, onNavigate }) {
   )
 }
 
+function ProtectedPage({ page, children }) {
+  return (
+    <ProtectedRoute>
+      <AppLayout currentPage={page}>
+        {children}
+      </AppLayout>
+    </ProtectedRoute>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={
-          <ProtectedRoute>
-            <AppLayout currentPage="dashboard">
-              <Dashboard />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/invoices" element={
-          <ProtectedRoute>
-            <AppLayout currentPage="invoices">
-              <Invoices />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/upload" element={
-          <ProtectedRoute>
-            <AppLayout currentPage="upload">
-              <Upload />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/invoices/:id" element={
-          <ProtectedRoute>
-            <AppLayout currentPage="invoices">
-              <InvoiceDetail />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/alerts" element={
-          <ProtectedRoute>
-            <AppLayout currentPage="alerts">
-              <Alerts />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
+        <Route path="/" element={<ProtectedPage page="dashboard"><Dashboard /></ProtectedPage>} />
+        <Route path="/invoices" element={<ProtectedPage page="invoices"><Invoices /></ProtectedPage>} />
+        <Route path="/upload" element={<ProtectedPage page="upload"><Upload /></ProtectedPage>} />
+        <Route path="/invoices/:id" element={<ProtectedPage page="invoices"><InvoiceDetail /></ProtectedPage>} />
+        <Route path="/alerts" element={<ProtectedPage page="alerts"><Alerts /></ProtectedPage>} />
+        <Route path="/analytics" element={<ProtectedPage page="analytics"><Analytics /></ProtectedPage>} />
+        <Route path="/audit-log" element={<ProtectedPage page="audit-log"><AuditLog /></ProtectedPage>} />
+        <Route path="/settings" element={<ProtectedPage page="settings"><Settings /></ProtectedPage>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
