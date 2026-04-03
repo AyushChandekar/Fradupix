@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, DocumentTOC, Invoice
+from app.models import User, Invoice
 from app.schemas import (
     DocumentQueryRequest, DocumentQueryResponse, DocumentQueryResult,
     DocumentTOCResponse, TOCEntry,
@@ -28,20 +28,23 @@ def query_document(
     """
     from app.services.rag_service import vectorless_rag_service
 
-    results = vectorless_rag_service.query_document(
+    rag_response = vectorless_rag_service.query_document(
         query=request.query,
         document_id=request.document_id,
         db=db,
         user_id=current_user.id,
     )
 
+    # rag_response is a dict: {"query", "document_id", "total_matches", "results": [...]}
+    raw_results = rag_response.get("results", [])
+
     query_results = []
-    for r in results:
+    for r in raw_results:
         query_results.append(DocumentQueryResult(
-            document_id=r["document_id"],
+            document_id=uuid.UUID(rag_response["document_id"]),
             page_number=r["page_number"],
             section_heading=r.get("section_heading"),
-            content_preview=r.get("content_preview", ""),
+            content_preview=r.get("content_snippet", ""),
             relevance_score=r.get("relevance_score", 0),
         ))
 
@@ -61,22 +64,24 @@ def get_document_toc(
     """
     SRS FR-802: Retrieve auto-generated table of contents for a document.
     """
-    # Verify document exists
     invoice = db.query(Invoice).filter(Invoice.id == document_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Document not found")
 
     from app.services.rag_service import vectorless_rag_service
-    entries = vectorless_rag_service.get_toc(document_id, db)
+
+    # get_toc returns a dict: {"document_id", "total_entries", "entries": [...dicts...]}
+    toc_response = vectorless_rag_service.get_toc(document_id, db)
+    raw_entries = toc_response.get("entries", [])
 
     toc_entries = [
         TOCEntry(
-            id=e.id,
-            entry_title=e.entry_title,
-            page_number=e.page_number,
-            level=e.level,
+            id=uuid.UUID(e["id"]),
+            entry_title=e["entry_title"],
+            page_number=e["page_number"],
+            level=e["level"],
         )
-        for e in entries
+        for e in raw_entries
     ]
 
     return DocumentTOCResponse(

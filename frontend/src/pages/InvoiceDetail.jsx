@@ -28,6 +28,13 @@ function ScoreCircle({ score, size=80, color }) {
   )
 }
 
+function getUserRole() {
+  try {
+    const u = localStorage.getItem('fradupix_user')
+    return u ? JSON.parse(u).role : null
+  } catch { return null }
+}
+
 export default function InvoiceDetail() {
   const { id } = useParams()
   const nav = useNavigate()
@@ -35,6 +42,8 @@ export default function InvoiceDetail() {
   const [decision, setDecision] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const userRole = getUserRole() || 'viewer'
+  const canReview = ['admin', 'manager', 'auditor'].includes(userRole)
 
   useEffect(() => {
     invoiceAPI.get(id).then(r => setInv(r.data)).catch(() => {})
@@ -115,8 +124,8 @@ export default function InvoiceDetail() {
         </div>}
       </div>
 
-      {/* Review Panel */}
-      {inv.status !== 'approved' && inv.status !== 'rejected' && (
+      {/* Review Panel - only shown to admin, manager, auditor */}
+      {canReview && inv.status !== 'approved' && inv.status !== 'rejected' && (
         <div className="card">
           <div className="card-title" style={{marginBottom:16}}>Audit Review</div>
           <div className="form-group">

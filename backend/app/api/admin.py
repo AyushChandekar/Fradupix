@@ -21,30 +21,18 @@ from app.schemas import (
     WebhookConfigCreate, WebhookConfigResponse,
     RiskWeightsConfig, RiskThresholdsConfig,
 )
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, require_role
 
 router = APIRouter(prefix="/api/v1", tags=["Admin"])
-
-
-def require_admin(user: User):
-    if user.role not in [UserRole.ADMIN]:
-        raise HTTPException(status_code=403, detail="Admin access required")
-
-
-def require_admin_or_auditor(user: User):
-    if user.role not in [UserRole.ADMIN, UserRole.AUDITOR]:
-        raise HTTPException(status_code=403, detail="Admin or Auditor access required")
 
 
 # ──── POST /api/v1/admin/models/retrain (SRS FR-604) ────
 @router.post("/admin/models/retrain", response_model=ModelRetrainResponse)
 def retrain_models(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """Trigger ML model retraining with latest labeled data."""
-    require_admin(current_user)
-
     try:
         from app.tasks.invoice_tasks import retrain_models as retrain_task
         task = retrain_task.delay()
@@ -53,7 +41,6 @@ def retrain_models(
             message=f"Retraining task queued: {task.id}",
         )
     except Exception:
-        # Sync fallback
         from app.ml.anomaly_detector import anomaly_detector
 
         confirmed = db.query(Invoice).filter(
@@ -93,11 +80,9 @@ def retrain_models(
 @router.get("/admin/models/metrics", response_model=ModelMetricsResponse)
 def get_model_metrics(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """Model performance metrics (precision, recall, F1, AUC-ROC)."""
-    require_admin(current_user)
-
     from app.ml.anomaly_detector import anomaly_detector
 
     training_count = db.query(Invoice).filter(
@@ -127,11 +112,9 @@ def query_audit_log(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.AUDITOR)),
 ):
     """Query immutable audit trail with filters."""
-    require_admin_or_auditor(current_user)
-
     query = db.query(AuditLog)
 
     if action:
@@ -165,8 +148,6 @@ async def erp_webhook(
     db: Session = Depends(get_db),
 ):
     """Webhook endpoint for ERP invoice push integration (API key auth)."""
-    # In production, validate API key from headers
-    # For now, accept and queue processing
     file_url = request_data.get("file_url")
     filename = request_data.get("filename", "erp_invoice.pdf")
 
@@ -181,11 +162,9 @@ async def erp_webhook(
 def create_webhook(
     config: WebhookConfigCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """Create a webhook configuration."""
-    require_admin(current_user)
-
     webhook = WebhookConfig(
         url=config.url,
         events=config.events,
@@ -202,10 +181,9 @@ def create_webhook(
 @router.get("/admin/webhooks")
 def list_webhooks(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """List all webhook configurations."""
-    require_admin(current_user)
     webhooks = db.query(WebhookConfig).all()
     return [WebhookConfigResponse.model_validate(w) for w in webhooks]
 
@@ -214,11 +192,9 @@ def list_webhooks(
 @router.put("/admin/risk-weights")
 def update_risk_weights(
     weights: RiskWeightsConfig,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """Allow administrators to configure risk score weights."""
-    require_admin(current_user)
-
     from app.services.risk_scoring import risk_scoring_service
     risk_scoring_service.update_weights(
         forgery=weights.forgery_weight,
@@ -233,11 +209,9 @@ def update_risk_weights(
 @router.put("/admin/risk-thresholds")
 def update_risk_thresholds(
     thresholds: RiskThresholdsConfig,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """Allow administrators to configure classification thresholds."""
-    require_admin(current_user)
-
     from app.services.risk_scoring import risk_scoring_service
     risk_scoring_service.update_thresholds(
         low_max=thresholds.low_max,

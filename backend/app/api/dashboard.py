@@ -15,7 +15,7 @@ from app.schemas import (
     DashboardStats, AlertItem, AlertsResponse,
     VendorRiskItem, VendorAnalyticsResponse,
 )
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, require_role
 
 router = APIRouter(prefix="/api/v1", tags=["Dashboard"])
 
@@ -74,12 +74,9 @@ def get_vendor_analytics(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.MANAGER, UserRole.AUDITOR)),
 ):
     """Vendor risk rankings and flagging frequency."""
-    if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER, UserRole.AUDITOR]:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Manager+ access required")
 
     since = datetime.utcnow() - timedelta(days=days)
 

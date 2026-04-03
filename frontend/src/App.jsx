@@ -18,9 +18,22 @@ function getUser() {
   } catch { return null }
 }
 
+function hasRole(requiredRoles) {
+  const user = getUser()
+  if (!user?.role) return false
+  return requiredRoles.includes(user.role)
+}
+
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('fradupix_token')
   if (!token) return <Navigate to="/login" replace />
+  return children
+}
+
+function RoleRoute({ children, roles }) {
+  const token = localStorage.getItem('fradupix_token')
+  if (!token) return <Navigate to="/login" replace />
+  if (!hasRole(roles)) return <Navigate to="/" replace />
   return children
 }
 
@@ -60,8 +73,16 @@ export default function App() {
         <Route path="/invoices/:id" element={<ProtectedPage page="invoices"><InvoiceDetail /></ProtectedPage>} />
         <Route path="/alerts" element={<ProtectedPage page="alerts"><Alerts /></ProtectedPage>} />
         <Route path="/analytics" element={<ProtectedPage page="analytics"><Analytics /></ProtectedPage>} />
-        <Route path="/audit-log" element={<ProtectedPage page="audit-log"><AuditLog /></ProtectedPage>} />
-        <Route path="/settings" element={<ProtectedPage page="settings"><Settings /></ProtectedPage>} />
+        <Route path="/audit-log" element={
+          <RoleRoute roles={['admin', 'manager', 'auditor']}>
+            <AppLayout currentPage="audit-log"><AuditLog /></AppLayout>
+          </RoleRoute>
+        } />
+        <Route path="/settings" element={
+          <RoleRoute roles={['admin']}>
+            <AppLayout currentPage="settings"><Settings /></AppLayout>
+          </RoleRoute>
+        } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

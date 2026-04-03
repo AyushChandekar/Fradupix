@@ -8,6 +8,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
+  const [role, setRole] = useState('analyst')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -22,7 +23,7 @@ export default function Login() {
       if (isLogin) {
         res = await authAPI.login(email, password)
       } else {
-        res = await authAPI.register({ email, username, password, full_name: fullName, role: 'auditor' })
+        res = await authAPI.register({ email, username, password, full_name: fullName, role })
       }
 
       const { access_token, user } = res.data
@@ -59,7 +60,7 @@ export default function Login() {
       <div className="login-container animate-slide-up">
         <div className="login-brand">
           <div className="login-brand-icon">🛡️</div>
-          <h1>fradupix</h1>
+          <h1>InvoiceFirewall</h1>
           <p>AI-Powered Invoice Fraud Detection Engine</p>
         </div>
 
@@ -113,6 +114,22 @@ export default function Login() {
               required
             />
           </div>
+
+          {!isLogin && (
+            <div className="form-group">
+              <label className="form-label">Role</label>
+              <select
+                className="form-input"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                required
+              >
+                <option value="viewer">Viewer</option>
+                <option value="analyst">Analyst</option>
+                <option value="auditor">Auditor</option>
+              </select>
+            </div>
+          )}
 
           {error && <div className="form-error" style={{ marginBottom: 16 }}>{error}</div>}
 

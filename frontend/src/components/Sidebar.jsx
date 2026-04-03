@@ -5,21 +5,37 @@ import {
   Building2, ScrollText, Wrench
 } from 'lucide-react'
 
-const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-  { id: 'invoices', label: 'Invoices', icon: FileText, path: '/invoices' },
-  { id: 'upload', label: 'Upload', icon: Upload, path: '/upload' },
-  { id: 'alerts', label: 'Alerts', icon: AlertTriangle, path: '/alerts' },
+// Role access mapping:
+// viewer:  Dashboard, Invoices (read-only), Alerts
+// analyst: Dashboard, Invoices, Upload, Alerts, Vendor Analytics
+// auditor: All except Settings
+// manager: All
+// admin:   All
+const allNavItems = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['viewer', 'analyst', 'auditor', 'manager', 'admin'] },
+  { id: 'invoices', label: 'Invoices', icon: FileText, path: '/invoices', roles: ['viewer', 'analyst', 'auditor', 'manager', 'admin'] },
+  { id: 'upload', label: 'Upload', icon: Upload, path: '/upload', roles: ['analyst', 'auditor', 'manager', 'admin'] },
+  { id: 'alerts', label: 'Alerts', icon: AlertTriangle, path: '/alerts', roles: ['viewer', 'analyst', 'auditor', 'manager', 'admin'] },
 ]
 
-const secondaryItems = [
-  { id: 'analytics', label: 'Vendor Analytics', icon: Building2, path: '/analytics' },
-  { id: 'audit-log', label: 'Audit Log', icon: ScrollText, path: '/audit-log' },
-  { id: 'settings', label: 'Settings', icon: Wrench, path: '/settings' },
+const allSecondaryItems = [
+  { id: 'analytics', label: 'Vendor Analytics', icon: Building2, path: '/analytics', roles: ['analyst', 'auditor', 'manager', 'admin'] },
+  { id: 'audit-log', label: 'Audit Log', icon: ScrollText, path: '/audit-log', roles: ['auditor', 'manager', 'admin'] },
+  { id: 'settings', label: 'Settings', icon: Wrench, path: '/settings', roles: ['admin'] },
 ]
+
+function getUserRole() {
+  try {
+    const u = localStorage.getItem('fradupix_user')
+    return u ? JSON.parse(u).role : null
+  } catch { return null }
+}
 
 export default function Sidebar({ currentPage }) {
   const navigate = useNavigate()
+  const role = getUserRole() || 'viewer'
+  const navItems = allNavItems.filter(item => item.roles.includes(role))
+  const secondaryItems = allSecondaryItems.filter(item => item.roles.includes(role))
 
   const handleLogout = () => {
     localStorage.removeItem('fradupix_token')
@@ -50,7 +66,7 @@ export default function Sidebar({ currentPage }) {
           </button>
         ))}
 
-        <div className="sidebar-section-title">Reports & Admin</div>
+        {secondaryItems.length > 0 && <div className="sidebar-section-title">Reports & Admin</div>}
         {secondaryItems.map(item => (
           <button
             key={item.id}

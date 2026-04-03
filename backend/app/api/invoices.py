@@ -23,7 +23,7 @@ from app.schemas import (
     BatchUploadResponse, ReviewCreate, ReviewResponse,
     DuplicateMatchItem, DuplicateMatchResponse,
 )
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, require_role
 from app.utils.audit_logger import audit_logger
 from app.config import get_settings
 
@@ -42,7 +42,7 @@ async def upload_invoice(
     file: UploadFile = File(...),
     request: Request = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.MANAGER, UserRole.AUDITOR, UserRole.ANALYST)),
 ):
     """Upload a single invoice for processing. Returns tracking ID immediately."""
     if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
@@ -103,7 +103,7 @@ async def batch_upload_invoices(
     files: List[UploadFile] = File(...),
     request: Request = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.MANAGER, UserRole.AUDITOR, UserRole.ANALYST)),
 ):
     """Batch upload up to 1000 invoices per API call."""
     if len(files) > settings.BATCH_UPLOAD_LIMIT:
@@ -256,12 +256,9 @@ def submit_review(
     review_data: ReviewCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.MANAGER, UserRole.AUDITOR)),
 ):
     """Submit auditor decision (approve/reject/escalate) with comments."""
-    if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER, UserRole.AUDITOR]:
-        raise HTTPException(status_code=403, detail="Auditor+ access required")
-
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -383,12 +380,9 @@ def get_invoice_evidence(
 def delete_invoice(
     invoice_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """Delete an invoice (admin only)."""
-    if current_user.role not in [UserRole.ADMIN]:
-        raise HTTPException(status_code=403, detail="Admin access required")
-
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
